@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robotics Supply Chain Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Barlow:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07090d;
+  --panel: #0c1018;
+  --panel2: #111820;
+  --border: #1c2a3a;
+  --border2: #243040;
+  --c1: #00e5ff;
+  --c2: #ff6b35;
+  --c3: #7bff6b;
+  --c4: #c87dff;
+  --c5: #ffd700;
+  --c6: #ff4d8d;
+  --c7: #4dffdb;
+  --c8: #ff9f4d;
+  --c9: #a0cfff;
+  --text: #cddbe8;
+  --muted: #4e6478;
+  --muted2: #7a94aa;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* ─── HEADER ─── */
+.header {
+  position: relative; z-index: 10;
+  padding: 48px 32px 36px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.eyebrow {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 5px;
+  color: var(--c1); text-transform: uppercase;
+  margin-bottom: 14px; opacity: 0.8;
+}
+h1 {
+  font-size: clamp(30px, 5vw, 58px);
+  font-weight: 800; letter-spacing: -1.5px;
+  line-height: 1.05; color: #fff;
+}
+h1 em { color: var(--c1); font-style: normal; }
+.subtitle {
+  margin-top: 10px; color: var(--muted2);
+  font-size: 15px; font-weight: 400; letter-spacing: .5px;
+}
+.stats-bar {
+  display: flex; justify-content: center; gap: 48px;
+  margin-top: 28px; flex-wrap: wrap;
+}
+.stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 22px; color: var(--c1); font-weight: 700;
+}
+.stat-lbl {
+  font-size: 10px; color: var(--muted); letter-spacing: 2px;
+  text-transform: uppercase; margin-top: 3px;
+}
+
+/* ─── LAYOUT ─── */
+.main {
+  position: relative; z-index: 10;
+  max-width: 1500px; margin: 0 auto;
+  padding: 32px 20px 80px;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 28px;
+  align-items: start;
+}
+@media(max-width: 900px) {
+  .main { grid-template-columns: 1fr; }
+}
+
+/* ─── ROBOT PANEL ─── */
+.robot-panel {
+  position: sticky; top: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 24px 20px;
+}
+.robot-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 3px;
+  color: var(--muted2); text-transform: uppercase;
+  margin-bottom: 16px; text-align: center;
+}
+.robot-svg-wrap {
+  display: flex; justify-content: center;
+  position: relative;
+}
+.robot-svg-wrap svg {
+  width: 100%; max-width: 280px;
+  filter: drop-shadow(0 0 20px rgba(0,229,255,0.08));
+}
+
+/* Robot part hover areas */
+.robot-part {
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+.robot-part:hover > path,
+.robot-part:hover > rect,
+.robot-part:hover > ellipse,
+.robot-part:hover > circle,
+.robot-part:hover > polygon {
+  filter: brightness(1.4);
+}
+.robot-part.active > path,
+.robot-part.active > rect,
+.robot-part.active > ellipse,
+.robot-part.active > circle,
+.robot-part.active > polygon {
+  stroke-width: 2 !important;
+}
+
+.robot-hint {
+  text-align: center;
+  font-size: 11px; color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 1px;
+  margin-top: 12px;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+/* ─── TOOLTIP ─── */
+#tooltip {
+  position: fixed; z-index: 1000;
+  width: 380px; max-width: 95vw;
+  background: #0a1520;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,229,255,0.08);
+  pointer-events: none;
+  opacity: 0; transform: translateY(8px) scale(0.97);
+  transition: opacity 0.18s, transform 0.18s;
+  overflow: hidden;
+}
+#tooltip.visible {
+  opacity: 1; transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.tt-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.tt-icon { font-size: 20px; }
+.tt-part-name {
+  font-size: 17px; font-weight: 700; color: #fff;
+  line-height: 1.2;
+}
+.tt-layer-badge {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  padding: 2px 7px; border-radius: 3px;
+  margin-top: 3px; display: inline-block;
+  background: rgba(0,229,255,0.1);
+  color: var(--c1);
+  border: 1px solid rgba(0,229,255,0.2);
+  text-transform: uppercase;
+}
+.tt-body { padding: 12px 16px; }
+.tt-section-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--c2); text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.tt-part-desc, .tt-layer-desc {
+  font-size: 13px; color: var(--muted2);
+  line-height: 1.55; margin-bottom: 12px;
+}
+.tt-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12px;
+}
+.tt-table th {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 1.5px;
+  color: var(--muted); text-transform: uppercase;
+  padding: 4px 8px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.tt-table td {
+  padding: 5px 8px; color: var(--text);
+  border-bottom: 1px solid rgba(28,42,58,0.5);
+  vertical-align: top;
+}
+.tt-table tr:last-child td { border-bottom: none; }
+.tt-ticker {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--c1);
+  background: rgba(0,229,255,0.07);
+  padding: 1px 5px; border-radius: 2px;
+  white-space: nowrap;
+}
+.tt-ticker.pvt { color: var(--muted); background: rgba(78,100,120,0.15); }
+.tt-show-more {
+  display: block; width: 100%;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted2);
+  padding: 7px; margin-top: 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all .15s;
+  pointer-events: auto;
+}
+.tt-show-more:hover { border-color: var(--c1); color: var(--c1); }
+.tt-extra { display: none; }
+.tt-extra.show { display: table-row-group; }
+
+/* ─── RIGHT COLUMN ─── */
+.layers-col { display: flex; flex-direction: column; gap: 10px; }
+
+/* control bar */
+.ctrl-bar {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  align-items: center; margin-bottom: 6px;
+}
+.ctrl-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--muted2);
+  padding: 6px 16px; border-radius: 3px;
+  cursor: pointer; transition: all .15s;
+}
+.ctrl-btn:hover, .ctrl-btn.active {
+  border-color: var(--c1); color: var(--c1);
+  background: rgba(0,229,255,0.05);
+}
+.spacer { flex: 1; }
+
+/* layers */
+.layer {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--c1);
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+  animation: fadeUp .4s ease both;
+}
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+.layer-hdr {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; cursor: pointer;
+  user-select: none; border-bottom: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.layer-hdr:hover { background: rgba(255,255,255,0.03); }
+.layer.open .layer-hdr { border-bottom-color: var(--border); }
+.layer-icon { font-size: 20px; width: 32px; text-align: center; flex-shrink: 0; }
+.layer-meta { flex: 1; min-width: 0; }
+.layer-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px; letter-spacing: 2px; color: var(--muted);
+}
+.layer-title { font-size: 17px; font-weight: 700; color: #fff; }
+.layer-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.layer-mkt {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px; color: var(--c3); text-align: right; flex-shrink: 0;
+}
+.layer-mkt small { display: block; font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+.chevron {
+  width: 18px; height: 18px; flex-shrink: 0;
+  color: var(--muted); transition: transform .25s;
+}
+.layer.open .chevron { transform: rotate(180deg); }
+.layer-body {
+  display: none; padding: 16px 18px;
+  flex-wrap: wrap; gap: 10px;
+}
+.layer.open .layer-body { display: flex; }
+
+/* supplier card */
+.sc {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 14px;
+  flex: 1 1 240px; min-width: 200px; max-width: 320px;
+  transition: background .15s, border-color .15s;
+}
+.sc:hover { background: rgba(255,255,255,0.05); border-color: var(--border2); }
+.sc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.sc-name { font-size: 14px; font-weight: 700; color: #fff; }
+.sc-country { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 1px; }
+.sc-ticker {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  padding: 2px 6px; border-radius: 2px; white-space: nowrap; flex-shrink: 0;
+  background: rgba(0,229,255,0.08); color: var(--c1);
+  border: 1px solid rgba(0,229,255,0.2);
+}
+.sc-ticker.pvt { background: rgba(78,100,120,0.12); color: var(--muted); border-color: rgba(78,100,120,0.3); }
+.sc-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 8px; }
+.sc-tag { font-size: 10px; padding: 1px 5px; border-radius: 2px; background: rgba(255,255,255,0.05); color: var(--muted2); font-family: 'Space Mono', monospace; }
+.sc-moat { font-size: 12px; color: #7a94aa; line-height: 1.5; border-top: 1px solid var(--border); padding-top: 7px; }
+.sc-moat-lbl { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--c2); letter-spacing: 2px; text-transform: uppercase; display: block; margin-bottom: 3px; }
+
+.footer {
+  position: relative; z-index: 10;
+  text-align: center; padding: 20px;
+  color: var(--muted); font-family: 'Space Mono', monospace;
+  font-size: 10px; letter-spacing: 1px;
+  border-top: 1px solid var(--border);
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">// global industrial intelligence — 2026</div>
+  <h1>Robotics <em>Supply Chain</em> Map</h1>
+  <div class="subtitle">Industrial Arms · Collaborative Robots · Humanoids — Full Stack</div>
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-val">9</div><div class="stat-lbl">Layers</div></div>
+    <div class="stat"><div class="stat-val">60+</div><div class="stat-lbl">Suppliers</div></div>
+    <div class="stat"><div class="stat-val">$500B+</div><div class="stat-lbl">TAM 2030E</div></div>
+    <div class="stat"><div class="stat-val">12</div><div class="stat-lbl">Countries</div></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- LEFT: Robot Anatomy -->
+  <div class="robot-panel">
+    <div class="robot-title">// hover robot anatomy</div>
+    <div class="robot-svg-wrap">
+      <svg id="robotSvg" viewBox="0 0 280 560" xmlns="http://www.w3.org/2000/svg">
+        <!-- definitions -->
+        <defs>
+          <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1a2a3a"/>
+            <stop offset="100%" stop-color="#0d1a28"/>
+          </linearGradient>
+          <linearGradient id="headGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#1e3040"/>
+            <stop offset="100%" stop-color="#0f1e2d"/>
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          </filter>
+        </defs>
+
+        <!-- ── HEAD / SENSORS ── -->
+        <g class="robot-part" data-part="head" id="part-head" tabindex="0">
+          <!-- head box -->
+          <rect x="90" y="20" width="100" height="75" rx="10" fill="url(#headGrad)" stroke="#1e3a50" stroke-width="1.2"/>
+          <!-- visor -->
+          <rect x="98" y="36" width="84" height="22" rx="4" fill="#051520" stroke="#00e5ff" stroke-width="1" opacity="0.9"/>
+          <!-- eye glow left -->
+          <ellipse cx="120" cy="47" rx="8" ry="5" fill="#00e5ff" opacity="0.85" filter="url(#glow)"/>
+          <ellipse cx="120" cy="47" rx="4" ry="2.5" fill="#fff" opacity="0.6"/>
+          <!-- eye glow right -->
+          <ellipse cx="160" cy="47" rx="8" ry="5" fill="#00e5ff" opacity="0.85" filter="url(#glow)"/>
+          <ellipse cx="160" cy="47" rx="4" ry="2.5" fill="#fff" opacity="0.6"/>
+          <!-- mouth grille -->
+          <rect x="108" y="67" width="64" height="4" rx="2" fill="#0a2030" stroke="#1e3a50" stroke-width="0.8"/>
+          <rect x="108" y="74" width="64" height="2" rx="1" fill="#0a2030" stroke="#1e3a50" stroke-width="0.5"/>
+          <!-- antenna left -->
+          <rect x="103" y="10" width="3" height="13" rx="1.5" fill="#1e3a50" stroke="#00e5ff" stroke-width="0.5"/>
+          <circle cx="104.5" cy="9" r="3" fill="#00e5ff" opacity="0.8"/>
+          <!-- antenna right -->
+          <rect x="174" y="10" width="3" height="13" rx="1.5" fill="#1e3a50" stroke="#00e5ff" stroke-width="0.5"/>
+          <circle cx="175.5" cy="9" r="3" fill="#00e5ff" opacity="0.8"/>
+          <!-- label -->
+          <text x="140" y="106" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="2">SENSORS</text>
+        </g>
+
+        <!-- ── NECK / COMPUTE ── -->
+        <g class="robot-part" data-part="neck" id="part-neck" tabindex="0">
+          <rect x="122" y="95" width="36" height="20" rx="3" fill="#0c1c2c" stroke="#1a2e42" stroke-width="1"/>
+          <rect x="128" y="99" width="8" height="12" rx="2" fill="#051018" stroke="#00e5ff" stroke-width="0.5" opacity="0.6"/>
+          <rect x="144" y="99" width="8" height="12" rx="2" fill="#051018" stroke="#00e5ff" stroke-width="0.5" opacity="0.6"/>
+          <text x="140" y="122" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="2">COMPUTE</text>
+        </g>
+
+        <!-- ── TORSO / POWER + SOFTWARE ── -->
+        <g class="robot-part" data-part="torso" id="part-torso" tabindex="0">
+          <!-- main chest -->
+          <rect x="78" y="116" width="124" height="110" rx="8" fill="url(#bodyGrad)" stroke="#1c2e42" stroke-width="1.2"/>
+          <!-- chest plate -->
+          <rect x="90" y="126" width="100" height="65" rx="5" fill="#081522" stroke="#1a3050" stroke-width="1"/>
+          <!-- arc reactor / power core -->
+          <circle cx="140" cy="155" r="18" fill="#040d18" stroke="#00e5ff" stroke-width="1" opacity="0.8"/>
+          <circle cx="140" cy="155" r="12" fill="#05131f" stroke="#00e5ff" stroke-width="1.5" opacity="0.9"/>
+          <circle cx="140" cy="155" r="6" fill="#00e5ff" opacity="0.7" filter="url(#glow)"/>
+          <circle cx="140" cy="155" r="3" fill="#fff" opacity="0.8"/>
+          <!-- circuit lines -->
+          <line x1="98" y1="155" x2="122" y2="155" stroke="#00e5ff" stroke-width="0.5" opacity="0.4"/>
+          <line x1="158" y1="155" x2="182" y2="155" stroke="#00e5ff" stroke-width="0.5" opacity="0.4"/>
+          <line x1="140" y1="137" x2="140" y2="131" stroke="#00e5ff" stroke-width="0.5" opacity="0.4"/>
+          <!-- lower chest details -->
+          <rect x="90" y="198" width="44" height="22" rx="3" fill="#081522" stroke="#1a3050" stroke-width="0.8"/>
+          <rect x="146" y="198" width="44" height="22" rx="3" fill="#081522" stroke="#1a3050" stroke-width="0.8"/>
+          <!-- vent lines -->
+          <line x1="96" y1="204" x2="128" y2="204" stroke="#1a3050" stroke-width="1"/>
+          <line x1="96" y1="208" x2="128" y2="208" stroke="#1a3050" stroke-width="1"/>
+          <line x1="96" y1="212" x2="128" y2="212" stroke="#1a3050" stroke-width="1"/>
+          <line x1="152" y1="204" x2="184" y2="204" stroke="#1a3050" stroke-width="1"/>
+          <line x1="152" y1="208" x2="184" y2="208" stroke="#1a3050" stroke-width="1"/>
+          <line x1="152" y1="212" x2="184" y2="212" stroke="#1a3050" stroke-width="1"/>
+          <text x="140" y="236" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="2">POWER / SOFTWARE</text>
+        </g>
+
+        <!-- ── LEFT SHOULDER / ACTUATORS ── -->
+        <g class="robot-part" data-part="shoulder-l" id="part-shoulder-l" tabindex="0">
+          <ellipse cx="60" cy="135" rx="18" ry="18" fill="#0e1e2e" stroke="#c87dff" stroke-width="1.2"/>
+          <ellipse cx="60" cy="135" rx="10" ry="10" fill="#081220" stroke="#c87dff" stroke-width="0.8" opacity="0.7"/>
+          <circle cx="60" cy="135" r="3" fill="#c87dff" opacity="0.7"/>
+        </g>
+
+        <!-- ── RIGHT SHOULDER / ACTUATORS ── -->
+        <g class="robot-part" data-part="shoulder-r" id="part-shoulder-r" tabindex="0">
+          <ellipse cx="220" cy="135" rx="18" ry="18" fill="#0e1e2e" stroke="#c87dff" stroke-width="1.2"/>
+          <ellipse cx="220" cy="135" rx="10" ry="10" fill="#081220" stroke="#c87dff" stroke-width="0.8" opacity="0.7"/>
+          <circle cx="220" cy="135" r="3" fill="#c87dff" opacity="0.7"/>
+          <text x="140" y="120" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="1.5">ACTUATORS</text>
+        </g>
+
+        <!-- ── LEFT UPPER ARM / MECHANICALS ── -->
+        <g class="robot-part" data-part="upper-arm-l" id="part-upper-arm-l" tabindex="0">
+          <rect x="36" y="150" width="28" height="65" rx="8" fill="#0c1820" stroke="#7bff6b" stroke-width="1"/>
+          <rect x="42" y="158" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+          <rect x="42" y="175" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+          <rect x="42" y="192" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+        </g>
+
+        <!-- ── RIGHT UPPER ARM / MECHANICALS ── -->
+        <g class="robot-part" data-part="upper-arm-r" id="part-upper-arm-r" tabindex="0">
+          <rect x="216" y="150" width="28" height="65" rx="8" fill="#0c1820" stroke="#7bff6b" stroke-width="1"/>
+          <rect x="222" y="158" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+          <rect x="222" y="175" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+          <rect x="222" y="192" width="16" height="12" rx="2" fill="#051015" stroke="#7bff6b" stroke-width="0.5" opacity="0.5"/>
+        </g>
+
+        <!-- ── LEFT ELBOW / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="elbow-l" id="part-elbow-l" tabindex="0">
+          <ellipse cx="50" cy="220" rx="16" ry="12" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="50" cy="220" rx="8" ry="6" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.8"/>
+        </g>
+
+        <!-- ── RIGHT ELBOW / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="elbow-r" id="part-elbow-r" tabindex="0">
+          <ellipse cx="230" cy="220" rx="16" ry="12" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="230" cy="220" rx="8" ry="6" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.8"/>
+        </g>
+
+        <!-- ── LEFT FOREARM ── -->
+        <g class="robot-part" data-part="forearm-l" id="part-forearm-l" tabindex="0">
+          <rect x="36" y="230" width="28" height="55" rx="6" fill="#0a1620" stroke="#ff9f4d" stroke-width="0.8" opacity="0.8"/>
+          <line x1="50" y1="238" x2="50" y2="278" stroke="#ff9f4d" stroke-width="0.5" opacity="0.3"/>
+        </g>
+
+        <!-- ── RIGHT FOREARM ── -->
+        <g class="robot-part" data-part="forearm-r" id="part-forearm-r" tabindex="0">
+          <rect x="216" y="230" width="28" height="55" rx="6" fill="#0a1620" stroke="#ff9f4d" stroke-width="0.8" opacity="0.8"/>
+          <line x1="230" y1="238" x2="230" y2="278" stroke="#ff9f4d" stroke-width="0.5" opacity="0.3"/>
+        </g>
+
+        <!-- ── LEFT HAND / END EFFECTORS ── -->
+        <g class="robot-part" data-part="hand-l" id="part-hand-l" tabindex="0">
+          <rect x="34" y="284" width="32" height="38" rx="5" fill="#0c1c2a" stroke="#4dffdb" stroke-width="1.2"/>
+          <!-- fingers -->
+          <rect x="35" y="320" width="6" height="18" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <rect x="43" y="316" width="6" height="22" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <rect x="51" y="318" width="6" height="20" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <!-- thumb -->
+          <rect x="28" y="288" width="8" height="14" rx="4" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <text x="50" y="350" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="1">END EFF.</text>
+        </g>
+
+        <!-- ── RIGHT HAND / END EFFECTORS ── -->
+        <g class="robot-part" data-part="hand-r" id="part-hand-r" tabindex="0">
+          <rect x="214" y="284" width="32" height="38" rx="5" fill="#0c1c2a" stroke="#4dffdb" stroke-width="1.2"/>
+          <!-- fingers -->
+          <rect x="215" y="320" width="6" height="18" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <rect x="223" y="316" width="6" height="22" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <rect x="231" y="318" width="6" height="20" rx="3" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+          <!-- thumb -->
+          <rect x="244" y="288" width="8" height="14" rx="4" fill="#0a1822" stroke="#4dffdb" stroke-width="0.8"/>
+        </g>
+
+        <!-- ── PELVIS / MECHANICALS ── -->
+        <g class="robot-part" data-part="pelvis" id="part-pelvis" tabindex="0">
+          <rect x="85" y="226" width="110" height="40" rx="6" fill="#0b1924" stroke="#1c2e42" stroke-width="1"/>
+          <rect x="95" y="233" width="40" height="26" rx="3" fill="#060f18" stroke="#1a3050" stroke-width="0.7"/>
+          <rect x="145" y="233" width="40" height="26" rx="3" fill="#060f18" stroke="#1a3050" stroke-width="0.7"/>
+          <text x="140" y="278" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="2">STRUCTURE</text>
+        </g>
+
+        <!-- ── LEFT HIP / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="hip-l" id="part-hip-l" tabindex="0">
+          <ellipse cx="103" cy="274" rx="18" ry="14" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="103" cy="274" rx="9" ry="7" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.7"/>
+        </g>
+
+        <!-- ── RIGHT HIP / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="hip-r" id="part-hip-r" tabindex="0">
+          <ellipse cx="177" cy="274" rx="18" ry="14" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="177" cy="274" rx="9" ry="7" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.7"/>
+        </g>
+
+        <!-- ── LEFT THIGH ── -->
+        <g class="robot-part" data-part="thigh-l" id="part-thigh-l" tabindex="0">
+          <rect x="88" y="284" width="30" height="75" rx="8" fill="#0c1820" stroke="#ff6b35" stroke-width="1"/>
+          <rect x="94" y="294" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+          <rect x="94" y="313" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+          <rect x="94" y="332" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+        </g>
+
+        <!-- ── RIGHT THIGH ── -->
+        <g class="robot-part" data-part="thigh-r" id="part-thigh-r" tabindex="0">
+          <rect x="162" y="284" width="30" height="75" rx="8" fill="#0c1820" stroke="#ff6b35" stroke-width="1"/>
+          <rect x="168" y="294" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+          <rect x="168" y="313" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+          <rect x="168" y="332" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.4"/>
+        </g>
+
+        <!-- ── LEFT KNEE / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="knee-l" id="part-knee-l" tabindex="0">
+          <ellipse cx="103" cy="362" rx="17" ry="11" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="103" cy="362" rx="8" ry="5" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.7"/>
+        </g>
+
+        <!-- ── RIGHT KNEE / MOTION COMPONENTS ── -->
+        <g class="robot-part" data-part="knee-r" id="part-knee-r" tabindex="0">
+          <ellipse cx="177" cy="362" rx="17" ry="11" fill="#0d1a28" stroke="#ff9f4d" stroke-width="1.2"/>
+          <ellipse cx="177" cy="362" rx="8" ry="5" fill="#060e18" stroke="#ff9f4d" stroke-width="0.8" opacity="0.7"/>
+        </g>
+
+        <!-- ── LEFT SHIN ── -->
+        <g class="robot-part" data-part="shin-l" id="part-shin-l" tabindex="0">
+          <rect x="88" y="370" width="30" height="70" rx="7" fill="#0c1820" stroke="#ff6b35" stroke-width="0.8"/>
+          <rect x="94" y="380" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.3"/>
+          <text x="103" y="454" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="1.5">ACTUATORS</text>
+        </g>
+
+        <!-- ── RIGHT SHIN ── -->
+        <g class="robot-part" data-part="shin-r" id="part-shin-r" tabindex="0">
+          <rect x="162" y="370" width="30" height="70" rx="7" fill="#0c1820" stroke="#ff6b35" stroke-width="0.8"/>
+          <rect x="168" y="380" width="18" height="14" rx="2" fill="#051015" stroke="#ff6b35" stroke-width="0.5" opacity="0.3"/>
+        </g>
+
+        <!-- ── LEFT FOOT ── -->
+        <g class="robot-part" data-part="foot-l" id="part-foot-l" tabindex="0">
+          <rect x="80" y="438" width="46" height="22" rx="5" fill="#0a1620" stroke="#ffd700" stroke-width="1"/>
+          <rect x="76" y="458" width="54" height="10" rx="4" fill="#08121c" stroke="#ffd700" stroke-width="0.8"/>
+          <text x="103" y="480" text-anchor="middle" fill="#4e6478" font-family="Space Mono,monospace" font-size="7" letter-spacing="1">POWER</text>
+        </g>
+
+        <!-- ── RIGHT FOOT ── -->
+        <g class="robot-part" data-part="foot-r" id="part-foot-r" tabindex="0">
+          <rect x="154" y="438" width="46" height="22" rx="5" fill="#0a1620" stroke="#ffd700" stroke-width="1"/>
+          <rect x="150" y="458" width="54" height="10" rx="4" fill="#08121c" stroke="#ffd700" stroke-width="0.8"/>
+        </g>
+
+      </svg>
+    </div>
+    <div class="robot-hint">↑ hover any part</div>
+  </div>
+
+  <!-- RIGHT: Supply Chain Layers -->
+  <div class="layers-col">
+    <div class="ctrl-bar">
+      <button class="ctrl-btn" id="expandBtn">Expand All</button>
+      <button class="ctrl-btn active" id="filterAll">All</button>
+      <button class="ctrl-btn" data-region="US">🇺🇸 US</button>
+      <button class="ctrl-btn" data-region="JP">🇯🇵 Japan</button>
+      <button class="ctrl-btn" data-region="DE">🇩🇪 Germany</button>
+      <button class="ctrl-btn" data-region="CN">🇨🇳 China</button>
+      <button class="ctrl-btn" data-region="TW">🇹🇼 Taiwan</button>
+    </div>
+    <div id="layersList"></div>
+  </div>
+
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div class="tt-header">
+    <div class="tt-icon" id="tt-icon"></div>
+    <div>
+      <div class="tt-part-name" id="tt-part-name"></div>
+      <div class="tt-layer-badge" id="tt-layer-badge"></div>
+    </div>
+  </div>
+  <div class="tt-body">
+    <div class="tt-section-label">Part Description</div>
+    <div class="tt-part-desc" id="tt-part-desc"></div>
+    <div class="tt-section-label">Layer Overview</div>
+    <div class="tt-layer-desc" id="tt-layer-desc"></div>
+    <div class="tt-section-label">Top Suppliers</div>
+    <table class="tt-table">
+      <thead><tr><th>Company</th><th>Ticker</th><th>Product</th></tr></thead>
+      <tbody id="tt-suppliers-top"></tbody>
+      <tbody id="tt-suppliers-extra" class="tt-extra"></tbody>
+    </table>
+    <button class="tt-show-more" id="tt-more-btn" style="display:none">+ Show More</button>
+  </div>
+</div>
+
+<div class="footer">Data as of Q1 2026 · Public tickers on major exchanges · Not investment advice</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+
+const LAYERS = [
+  {
+    id: "compute", num:"01", icon:"⚡", title:"Compute & Control",
+    desc:"AI chips, MCUs, FPGAs, edge inference, robot controllers",
+    market:"$38B", color:"#00e5ff",
+    layerDesc:"The brain of every robot. Ranges from high-power GPUs running neural networks to tiny real-time MCUs running PID loops in microseconds. Modern humanoids need both: a GPU for perception/AI and multiple MCUs for deterministic joint control.",
+    suppliers:[
+      {name:"NVIDIA",       country:"🇺🇸 US", ticker:"NVDA",    products:["Jetson Orin","Isaac Sim","H100"],    moat:"Dominant GPU ecosystem (CUDA); Isaac robotics platform; GR00T foundation model; 80%+ AI training silicon."},
+      {name:"Texas Instruments",country:"🇺🇸 US",ticker:"TXN",  products:["TMS320 DSP","Sitara MCU","TDA SoC"],moat:"50yr analog/DSP heritage; sticky long-term supply agreements; low-power RT control MCUs in millions of robots."},
+      {name:"STMicroelectronics",country:"🇨🇭 CH",ticker:"STM", products:["STM32","SPC5x","MEMS MCU"],          moat:"STM32 de-facto motor control MCU standard; vertical MEMS+MCU integration; automotive-grade reliability."},
+      {name:"AMD",           country:"🇺🇸 US", ticker:"AMD",    products:["Xilinx FPGAs","EPYC","Ryzen Edge"],  moat:"Xilinx acquisition gives leading FPGA portfolio; competitive GPU at lower cost than NVIDIA."},
+      {name:"Renesas",       country:"🇯🇵 JP", ticker:"6723.T", products:["RZ/T2M","RA MCU","R-Car"],           moat:"Dominant Japanese industrial MCU; deep OEM qualification; IEC 61508 functional safety certified."},
+      {name:"Qualcomm",      country:"🇺🇸 US", ticker:"QCOM",   products:["RB3 Gen 2","Snapdragon"],            moat:"5G+AI edge SoC convergence; robotics reference design reduces OEM time-to-market significantly."},
+    ]
+  },
+  {
+    id:"sensors", num:"02", icon:"👁️", title:"Sensors & Perception",
+    desc:"LiDAR, vision cameras, force/torque, IMUs, tactile sensors",
+    market:"$22B", color:"#ff6b35",
+    layerDesc:"Robots perceive the world through sensors. Vision cameras handle object recognition, LiDAR maps 3D space, IMUs measure orientation and acceleration, and force/torque sensors give touch feedback critical for safe human collaboration.",
+    suppliers:[
+      {name:"Cognex",        country:"🇺🇸 US", ticker:"CGNX",   products:["In-Sight cameras","DataMan","VisionPro"], moat:"30yr machine vision library; 90%+ gross margins; deep SI channel; FDA/auto quality inspection certified."},
+      {name:"Keyence",       country:"🇯🇵 JP", ticker:"6861.T", products:["CV-X vision","LJ-X LiDAR","GV sensors"],  moat:"Direct sales (no distributors) enables premium pricing; proprietary optics; highest GM in sensors sector."},
+      {name:"Sony Semiconductor",country:"🇯🇵 JP",ticker:"6758.T",products:["IMX sensors","SPAD LiDAR"],             moat:"60%+ global CMOS image sensor share; stacked architecture; de facto supply bottleneck for robot vision."},
+      {name:"Luminar",       country:"🇺🇸 US", ticker:"LAZR",   products:["Iris+ LiDAR"],                           moat:"Automotive-grade long-range LiDAR; Volvo/SAIC OEM wins; 1550nm eye-safe wavelength leadership."},
+      {name:"Ouster",        country:"🇺🇸 US", ticker:"OUST",   products:["REV7","OS Series"],                      moat:"Solid-state digital LiDAR ASIC; scale post-Velodyne merger; broadest AMR/industrial install base."},
+      {name:"Hexagon AB",    country:"🇸🇪 SE", ticker:"HEXA-B.ST",products:["Leica sensors","Absolute Arm"],        moat:"Metrology gold standard; measurement software+hardware integration; sticky enterprise SDS software."},
+    ]
+  },
+  {
+    id:"actuators", num:"03", icon:"🔩", title:"Actuators",
+    desc:"Servo motors, linear actuators, hydraulic/pneumatic systems",
+    market:"$35B", color:"#7bff6b",
+    layerDesc:"Actuators convert electrical signals into physical motion. Servo motors dominate precise joint control, while pneumatic actuators handle gripping and linear motion. High-torque-density BLDC motors are critical for bipedal humanoid locomotion.",
+    suppliers:[
+      {name:"Yaskawa Electric",country:"🇯🇵 JP",ticker:"6506.T",products:["Sigma-7 Servo","AC Drives","Motoman"], moat:"#1 global servo motor share; in-house servo+drive+controller integration; 1M+ global installed base."},
+      {name:"Fanuc",         country:"🇯🇵 JP", ticker:"6954.T", products:["αi Servo Series","CNC integrated"],    moat:"Vertical factory integration (CNC→servo→robot); legendary reliability; massive Japan auto captive install."},
+      {name:"Harmonic Drive", country:"🇯🇵 JP",ticker:"6324.T", products:["Strain wave gears","FHA servo"],       moat:"De facto monopoly in strain wave gears used in ~80% of articulated robots; heavily IP-protected precision."},
+      {name:"Nabtesco",      country:"🇯🇵 JP", ticker:"6268.T", products:["RV reducers","Precision gears"],       moat:"~60% global RV reducer market share; critical bottleneck joint gearbox; extremely hard to substitute."},
+      {name:"SMC Corporation",country:"🇯🇵 JP",ticker:"6273.T", products:["Pneumatic actuators","Grippers"],      moat:"World's largest pneumatic component maker; 700k+ SKU catalog; next-day delivery logistics network."},
+      {name:"Rockwell Automation",country:"🇺🇸 US",ticker:"ROK",products:["Kinetix servos","Allen-Bradley PLC"], moat:"Integrated PLC+servo+HMI ecosystem lock-in; dominant US discrete manufacturing automation brand."},
+    ]
+  },
+  {
+    id:"motion", num:"04", icon:"⚙️", title:"Motion Components",
+    desc:"Precision gears, bearings, ball screws, linear guides, reducers",
+    market:"$28B", color:"#c87dff",
+    layerDesc:"The mechanical transmission layer — converting rotary to linear motion, reducing speed while multiplying torque. Linear guides, ball screws, and bearings determine positioning accuracy. RV and harmonic reducers are the critical joint components in all articulated robots.",
+    suppliers:[
+      {name:"THK Co.",       country:"🇯🇵 JP", ticker:"6481.T", products:["LM Guides","Ball screws","Link Ball"],  moat:"Inventor of linear motion guides; ~40% global share; specification standard in machine tool/robot OEM design."},
+      {name:"NSK Ltd",       country:"🇯🇵 JP", ticker:"6471.T", products:["Precision bearings","Ball screws"],     moat:"Global top-3 bearings; integrated ball screw+servo technology; deep OEM qualification in KUKA, ABB, Fanuc."},
+      {name:"Schaeffler",    country:"🇩🇪 DE", ticker:"SHA.DE", products:["INA/FAG bearings","Robot joints"],      moat:"INA+FAG brands dominant in EU; dedicated robotics joint unit; expanding into actuator modules for humanoids."},
+      {name:"Hiwin Technologies",country:"🇹🇼 TW",ticker:"2049.TW",products:["Linear guideways","Ball screws","DDR motors"],moat:"Taiwan's dominant linear motion supplier; cost-competitive vs Japanese; growing robot/humanoid share."},
+      {name:"Nabtesco",      country:"🇯🇵 JP", ticker:"6268.T", products:["RV gears","Precision reducers"],       moat:"Dual-layer critical: RV reducer monopoly makes them essential at both actuator and motion component layer."},
+      {name:"Spinea",        country:"🇸🇰 SK", ticker:"Private", products:["TwinSpin cycloidal gears"],           moat:"Cycloidal gears as Nabtesco alternative; growing adoption in collaborative robots; European supply security."},
+    ]
+  },
+  {
+    id:"power", num:"05", icon:"🔋", title:"Power Systems",
+    desc:"Servo drives, power electronics, batteries, energy management",
+    market:"$18B", color:"#ffd700",
+    layerDesc:"Every robot needs power conversion, storage, and management. SiC power semiconductors enable high-efficiency drives. Battery energy density directly limits humanoid runtime. The shift to 48V bus architecture (Tesla Optimus, Figure) is a key design trend.",
+    suppliers:[
+      {name:"Infineon Technologies",country:"🇩🇪 DE",ticker:"IFX.DE",products:["IGBT modules","SiC MOSFETs","Gate drivers"],moat:"#1 power semiconductor globally; SiC leadership for next-gen high-efficiency drives; CoolSiC brand."},
+      {name:"ON Semiconductor",country:"🇺🇸 US",ticker:"ON",   products:["SiC modules","IGBT","Motor drivers"],  moat:"SiC wafer vertical integration (growing own boules); strong automotive+industrial dual demand at scale."},
+      {name:"Vicor Corporation",country:"🇺🇸 US",ticker:"VICR", products:["48V Power Components","BCM modules"], moat:"48V bus architecture IP perfectly positioned for humanoids (Tesla Optimus, Figure); proprietary topology."},
+      {name:"Analog Devices", country:"🇺🇸 US",ticker:"ADI",   products:["BMS ICs","Isolated Gate Drivers"],     moat:"Battery management+signal chain integration; isolated ADC for motor feedback; sticky mixed-signal IP."},
+      {name:"Samsung SDI",   country:"🇰🇷 KR", ticker:"006400.KS",products:["Li-ion cells","Prismatic packs"],   moat:"Cell tech scale; high energy density; humanoids need compact high-C-rate packs — emerging bottleneck."},
+      {name:"CATL",          country:"🇨🇳 CN", ticker:"300750.SZ",products:["LFP/NMC cells","BMS"],             moat:"World's largest battery maker by volume; cost leadership; rapid expansion into industrial/robotics segments."},
+    ]
+  },
+  {
+    id:"mechanicals", num:"06", icon:"🏗️", title:"Mechanical Structure",
+    desc:"Frames, links, castings, carbon fiber composites, additive mfg",
+    market:"$15B", color:"#ff4d8d",
+    layerDesc:"The skeleton. Structural weight directly affects payload capacity and energy consumption. Carbon fiber composites are increasingly used for robot links (high stiffness-to-weight). Additive manufacturing enables topology-optimized structures impossible with traditional machining.",
+    suppliers:[
+      {name:"Toray Industries",country:"🇯🇵 JP",ticker:"3402.T", products:["Carbon fiber","CFRP composites"],     moat:"~35% global carbon fiber share; Torayca T/M/P engineering standards; Boeing+Airbus+robot OEM lock-in."},
+      {name:"Hexcel Corporation",country:"🇺🇸 US",ticker:"HXL",  products:["HexTow CF","Prepregs","Honeycomb"],  moat:"Aerospace-grade composite expertise translates to lightweight robot arm structures; OEM co-development."},
+      {name:"Stratasys",     country:"🇺🇸 US", ticker:"SSYS",    products:["FDM","Polyjet","Fiber"],             moat:"Additive mfg for robot link prototyping and serial production; topology-optimized structures at speed."},
+      {name:"GE Additive (Arcam)",country:"🇺🇸 US",ticker:"GE",  products:["EBM Ti parts","Ni superalloy AM"],  moat:"Titanium EBM for high-strength/weight humanoid joints; aerospace certification transfers to robotics."},
+      {name:"Fanuc (captive)",country:"🇯🇵 JP", ticker:"6954.T", products:["CNC machined castings"],             moat:"Machines own robot bodies in-house — extreme vertical integration giving quality control and IP protection."},
+    ]
+  },
+  {
+    id:"endeffectors", num:"07", icon:"🤏", title:"End Effectors & Grippers",
+    desc:"Robot hands, grippers, tool changers, welding torches, vacuum",
+    market:"$6B", color:"#4dffdb",
+    layerDesc:"The interface between robot and world. Grippers must handle enormous variety — from 0.1g electronics components to 30kg automotive parts. Dexterous anthropomorphic hands are a key enabler for humanoid deployment in unstructured environments.",
+    suppliers:[
+      {name:"Schunk GmbH",   country:"🇩🇪 DE", ticker:"Private", products:["PGN grippers","SWK tool changers","EGP electric"], moat:"World's broadest gripper catalog; tool changer industry standard; dominant EU system integrators."},
+      {name:"OnRobot",       country:"🇩🇰 DK", ticker:"Private", products:["RG2/6 grippers","Eyes vision","Gecko"],moat:"Universal interface fits ANY cobot brand; Gecko adhesion gripper for flat materials; fast OEM channel."},
+      {name:"Piab Group",    country:"🇸🇪 SE", ticker:"Private", products:["COAX vacuum","piGRIP","Kenos"],       moat:"Patented COAX multi-stage vacuum ejector (3-5x energy saving); growing soft goods/food robot adoption."},
+      {name:"Destaco (Dover)",country:"🇺🇸 US",ticker:"DOV",     products:["Toggle clamps","CAMCO","Vacuum cups"],moat:"100yr automotive tooling heritage; embedded in GM/Ford/Toyota robot cells globally; sticky replacement."},
+      {name:"Shadow Robot",  country:"🇬🇧 UK", ticker:"Private", products:["Dexterous Hand","Smart Grasping"],   moat:"24-DOF anthropomorphic hand; used in OpenAI/DeepMind humanoid R&D; highest market fidelity."},
+      {name:"Righthand Robotics",country:"🇺🇸 US",ticker:"Private",products:["RightPick","Flex"],               moat:"AI piece-picking trained on billions of cycles; acquired into Berkshire Grey e-commerce robotics stack."},
+    ]
+  },
+  {
+    id:"oems", num:"08", icon:"🤖", title:"Robot OEMs & Integrators",
+    desc:"Complete systems — industrial arms, cobots, AMRs, humanoids",
+    market:"$75B", color:"#ff9f4d",
+    layerDesc:"The system integrators and OEMs who assemble the full stack. The Big Four Japanese/European industrial players dominate traditional factory automation. Humanoid startups are racing to prove commercial viability. China is disrupting on price with Unitree and others.",
+    suppliers:[
+      {name:"Fanuc",         country:"🇯🇵 JP", ticker:"6954.T", products:["R-2000","CRX cobot","ROBOSHOT"],      moat:"30%+ global industrial arm share; legendary uptime; massive parts+service annuity; $10B market cap pure-play."},
+      {name:"ABB Robotics",  country:"🇨🇭 CH", ticker:"ABB",    products:["IRB series","YuMi","GoFa cobot"],     moat:"Broadest industrial portfolio; integrated drives+controllers; global service network across 100+ countries."},
+      {name:"KUKA (Midea)",  country:"🇩🇪 DE", ticker:"KUKA.DE",products:["KR AGILUS","iiwa cobot","iisy"],      moat:"EU automotive standard; iiwa pioneered torque-sensor cobot; Midea ownership gives China market pipeline."},
+      {name:"Universal Robots",country:"🇩🇰 DK",ticker:"TER",   products:["UR3e–UR30","UR+ ecosystem"],          moat:"Invented collaborative robot category; 50%+ cobot global share; UR+ app ecosystem creates platform lock-in."},
+      {name:"Figure AI",     country:"🇺🇸 US", ticker:"Private",products:["Figure 02"],                          moat:"OpenAI VLA model partnership; BMW factory deployment; best-funded pure humanoid ($675M raised)."},
+      {name:"Boston Dynamics",country:"🇺🇸 US",ticker:"Private (000270.KS)",products:["Spot","Atlas","Stretch"],moat:"10yr+ dynamic locomotion R&D; Spot commercially deployed at 1000s of sites; Hyundai manufacturing backing."},
+      {name:"Unitree",       country:"🇨🇳 CN", ticker:"Private",products:["G1","H1","Go2"],                      moat:"H1 humanoid at $16k vs $150k+ Western peers; open SDK driving global developer adoption; price disruptor."},
+    ]
+  },
+  {
+    id:"software", num:"09", icon:"💾", title:"Software, Simulation & AI",
+    desc:"Robot OS, simulation, digital twins, foundation models, fleet mgmt",
+    market:"$12B", color:"#a0cfff",
+    layerDesc:"Software is eating robotics. Physics simulators compress years of real-world training into hours. Foundation models (VLAs) promise general-purpose robots that learn from internet data. ROS 2 provides the open-source middleware backbone that unifies the industry.",
+    suppliers:[
+      {name:"NVIDIA Isaac",  country:"🇺🇸 US", ticker:"NVDA",   products:["Isaac Sim","Isaac ROS","GR00T","Isaac Lab"],moat:"GR00T humanoid foundation model; Omniverse physics sim; GPU monopoly = sim compute advantage."},
+      {name:"Siemens Xcelerator",country:"🇩🇪 DE",ticker:"SIE.DE",products:["Tecnomatix","NX","MindSphere"],    moat:"Dominant PLM+robot simulation suite; Tecnomatix industry standard for cell programming; deep OEM lock-in."},
+      {name:"Physical Intelligence",country:"🇺🇸 US",ticker:"Private",products:["π0 VLA model"],              moat:"Top robot learning researchers (Levine, Finn); π0 general-purpose policy across hardware; $400M raised."},
+      {name:"PTC Inc",       country:"🇺🇸 US", ticker:"PTC",    products:["Vuforia AR","ThingWorx","Windchill"], moat:"AR-guided maintenance + PLM integration; sticky enterprise SaaS; Rockwell strategic partnership."},
+      {name:"Google DeepMind",country:"🇺🇸 US",ticker:"GOOGL",  products:["MuJoCo","RT-X","Gemini Robotics"],   moat:"MuJoCo premier physics sim; RT-X cross-embodiment dataset; deepest research talent in robot learning."},
+      {name:"Open Robotics / ROS",country:"🇺🇸 US",ticker:"OSS",products:["ROS 2","Gazebo","Nav2"],             moat:"De facto open-source robot OS; 90%+ of new projects start on ROS; massive package+developer network effect."},
+    ]
+  },
+];
+
+// ─── ROBOT PART → LAYER MAPPING ──────────────────────────────────────────────
+
+const PART_DATA = {
+  "head": {
+    partName: "Head & Vision System",
+    layerId: "sensors",
+    icon: "👁️",
+    partDesc: "The robot's sensory hub. Houses stereo cameras, depth sensors, LiDAR arrays, microphones, and IMUs. In humanoids, the head enables natural human-robot interaction through gaze direction. Sensor fusion algorithms combine all inputs into a coherent world model."
+  },
+  "neck": {
+    partName: "Neck & Compute Module",
+    layerId: "compute",
+    icon: "⚡",
+    partDesc: "The neck often houses compute boards, GPU modules, and communication hubs. It routes power and data between head sensors and the central processing stack in the torso. Critical for low-latency inference close to sensors."
+  },
+  "torso": {
+    partName: "Torso — Power Core & AI Stack",
+    layerId: "power",
+    icon: "🔋",
+    partDesc: "The torso is the most component-dense region. It houses the main battery pack, power electronics, primary compute (GPU + MCUs), thermal management, and wireless communication. Mass and volume are tightly constrained — every cubic centimeter matters."
+  },
+  "shoulder-l": {
+    partName: "Shoulder Joint (Left)",
+    layerId: "actuators",
+    icon: "🔩",
+    partDesc: "A 3-DOF joint enabling full arm mobility. Uses high-torque BLDC motors combined with precision strain wave or RV gearboxes. Requires absolute encoders for position feedback. One of the highest-loaded joints in a humanoid — must support arm + payload weight."
+  },
+  "shoulder-r": {
+    partName: "Shoulder Joint (Right)",
+    layerId: "actuators",
+    icon: "🔩",
+    partDesc: "Mirror of the left shoulder. Paired shoulder actuators give ±180° rotation, flexion, and abduction. Torque-controlled operation is essential for safe human collaboration. Often the most expensive joint in the arm assembly."
+  },
+  "upper-arm-l": {
+    partName: "Upper Arm Structure (Left)",
+    layerId: "mechanicals",
+    icon: "🏗️",
+    partDesc: "Carbon fiber reinforced polymer (CFRP) tubes or machined aluminum links form the upper arm. Topology optimization minimizes weight while meeting stiffness targets. Cable routing for distal motor drives runs through hollow structural members."
+  },
+  "upper-arm-r": {
+    partName: "Upper Arm Structure (Right)",
+    layerId: "mechanicals",
+    icon: "🏗️",
+    partDesc: "Identical structural requirements as the left arm. Mirror symmetry in design reduces BOM complexity. Internal cable management must allow full range of motion without fouling. Thermal conductivity of the link helps dissipate motor heat."
+  },
+  "elbow-l": {
+    partName: "Elbow Joint (Left)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "A 1-2 DOF hinge joint using crossed-roller or angular contact bearings for high rigidity. Cycloidal or harmonic reducers step down motor speed to joint-level torque. Encoder resolution at this joint directly affects end-effector repeatability."
+  },
+  "elbow-r": {
+    partName: "Elbow Joint (Right)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "Elbow joints see high dynamic loads during fast arm motions. Preloaded bearings eliminate backlash. Integrated joint modules (motor + gearbox + encoder + driver) from suppliers like Maxon or Dynamixel are increasingly common."
+  },
+  "forearm-l": {
+    partName: "Forearm (Left)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "Houses wrist actuator motors and forearm rotation drive. Cable/tendon routing for finger actuation adds complexity. Lightweight construction is critical as forearm mass amplifies shoulder joint torque requirements significantly."
+  },
+  "forearm-r": {
+    partName: "Forearm (Right)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "Forearm design trades off between housing distal motors locally (heavier forearm, less cable complexity) versus proximal motor placement (lighter forearm, complex tendon routing). Different humanoid architectures make opposing choices here."
+  },
+  "hand-l": {
+    partName: "Hand & End Effector (Left)",
+    layerId: "endeffectors",
+    icon: "🤏",
+    partDesc: "The most complex subsystem per gram. A dexterous humanoid hand requires 12-24 DOF, tactile sensors on fingertips, and sub-millimeter position control. Current state-of-art uses tendon-driven or direct-drive designs. Force sensing is critical for grasping fragile objects."
+  },
+  "hand-r": {
+    partName: "Hand & End Effector (Right)",
+    layerId: "endeffectors",
+    icon: "🤏",
+    partDesc: "Right hand often designated as primary manipulation hand. Tactile sensor arrays (from companies like SynTouch or Xela Robotics) provide distributed pressure sensing. Tool changers allow swapping between grippers, screwdrivers, and other specialized end effectors."
+  },
+  "pelvis": {
+    partName: "Pelvis & Hip Structure",
+    layerId: "mechanicals",
+    icon: "🏗️",
+    partDesc: "The structural bridge between upper and lower body. Houses the waist joint (1-2 DOF), battery connections, and lower-body compute. Must withstand high bending moments from leg ground reaction forces. Aluminum or titanium casting with machined bearing seats."
+  },
+  "hip-l": {
+    partName: "Hip Joint (Left)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "3-DOF hip joint is the most critical for bipedal locomotion. Requires highest torque output of any joint (supporting body weight during single-leg stance). Uses large RV or planetary reducers. Hip joint design largely determines walking efficiency and stability."
+  },
+  "hip-r": {
+    partName: "Hip Joint (Right)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "Mirror of the left hip. Hip actuator motors are typically the largest and most powerful in a humanoid. Peak torque requirements during stair climbing or disturbance rejection can be 3-5x continuous walking torque — a critical design driver."
+  },
+  "thigh-l": {
+    partName: "Thigh Link (Left)",
+    layerId: "mechanicals",
+    icon: "🏗️",
+    partDesc: "The primary structural member of the leg. Must resist large bending and torsional moments. Often houses the knee joint actuator motor for mass concentration near the body center (reducing leg inertia). Material: CFRP tube with aluminum end fittings."
+  },
+  "thigh-r": {
+    partName: "Thigh Link (Right)",
+    layerId: "mechanicals",
+    icon: "🏗️",
+    partDesc: "Symmetric to left thigh. Proximal motor placement strategy places knee drive motor in the thigh, transmitting torque via ball screws or cables to the knee joint. This reduces swing-leg inertia by up to 40%, improving locomotion efficiency."
+  },
+  "knee-l": {
+    partName: "Knee Joint (Left)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "Typically a 1-DOF hinge (±130° flex/extension). Must handle high impact loads during heel-strike. Linear actuators (ball screw driven) or rotary reducers both used in practice. Compliant elements or series elastic actuators (SEA) help absorb ground impact."
+  },
+  "knee-r": {
+    partName: "Knee Joint (Right)",
+    layerId: "motion",
+    icon: "⚙️",
+    partDesc: "High cycle count requirements — a bipedal robot walking at 1.5 m/s takes ~1.5 steps/sec, meaning 100M+ knee cycles over a 5-year lifespan. Bearing selection and lubrication are critical for longevity. NSK and THK supply specialized linear/rotary bearings for this application."
+  },
+  "shin-l": {
+    partName: "Shin & Lower Leg (Left)",
+    layerId: "actuators",
+    icon: "🔩",
+    partDesc: "Houses ankle actuator motor and sensor suite (IMU, contact sensors). Ankle drive via Bowden cables or direct shaft. Carbon fiber construction minimizes distal leg inertia. Ankle plantarflexion power is the primary driver of forward propulsion in human-like gait."
+  },
+  "shin-r": {
+    partName: "Shin & Lower Leg (Right)",
+    layerId: "actuators",
+    icon: "🔩",
+    partDesc: "Symmetric to left shin. The shinbone-equivalent also routes power and signal cables to the foot/ankle. Impact-resistant outer shell (often TPU or fiberglass) protects internal components from collisions during operation in unstructured environments."
+  },
+  "foot-l": {
+    partName: "Foot & Power Distribution (Left)",
+    layerId: "power",
+    icon: "🔋",
+    partDesc: "The foot integrates 6-axis force/torque sensing for ground contact estimation, multi-point pressure sensors for stability control, and the ankle joint structure. Some designs embed battery cells in the feet for low center-of-gravity mass distribution."
+  },
+  "foot-r": {
+    partName: "Foot & Power Distribution (Right)",
+    layerId: "power",
+    icon: "🔋",
+    partDesc: "Foot geometry and compliance tuning are critical for stable bipedal walking. Rigid feet excel on flat surfaces; compliant soles handle uneven terrain. Force sensors in the foot feed the Zero Moment Point (ZMP) controller 1kHz+ for real-time balance."
+  },
+};
+
+// ─── LAYER COLOR MAP ─────────────────────────────────────────────────────────
+const LAYER_COLORS = {};
+LAYERS.forEach(l => { LAYER_COLORS[l.id] = l.color; });
+const LAYER_MAP = {};
+LAYERS.forEach(l => { LAYER_MAP[l.id] = l; });
+
+// ─── RENDER LAYERS ───────────────────────────────────────────────────────────
+
+function renderLayers() {
+  var container = document.getElementById('layersList');
+  container.innerHTML = '';
+
+  LAYERS.forEach(function(layer, li) {
+    var div = document.createElement('div');
+    div.className = 'layer';
+    div.id = 'layer-' + layer.id;
+    div.style.borderLeftColor = layer.color;
+    div.style.animationDelay = (li * 0.05) + 's';
+
+    var hdr = document.createElement('div');
+    hdr.className = 'layer-hdr';
+    hdr.setAttribute('data-idx', li);
+
+    hdr.innerHTML =
+      '<div class="layer-icon">' + layer.icon + '</div>' +
+      '<div class="layer-meta">' +
+        '<div class="layer-num">Layer ' + layer.num + '</div>' +
+        '<div class="layer-title">' + layer.title + '</div>' +
+        '<div class="layer-desc">' + layer.desc + '</div>' +
+      '</div>' +
+      '<div class="layer-mkt">' + layer.market + '<small>TAM 2025E</small></div>' +
+      '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>';
+
+    hdr.addEventListener('click', function() {
+      div.classList.toggle('open');
+    });
+
+    var body = document.createElement('div');
+    body.className = 'layer-body';
+
+    layer.suppliers.forEach(function(s) {
+      var card = document.createElement('div');
+      card.className = 'sc';
+      card.setAttribute('data-country', s.country);
+
+      var isPrivate = s.ticker === 'Private' || s.ticker === 'OSS';
+      var tickerClass = isPrivate ? 'sc-ticker pvt' : 'sc-ticker';
+
+      var tags = s.products.map(function(p) {
+        return '<span class="sc-tag">' + p + '</span>';
+      }).join('');
+
+      card.innerHTML =
+        '<div class="sc-top">' +
+          '<div>' +
+            '<div class="sc-name">' + s.name + '</div>' +
+            '<div class="sc-country">' + s.country + '</div>' +
+          '</div>' +
+          '<div class="' + tickerClass + '">' + s.ticker + '</div>' +
+        '</div>' +
+        '<div class="sc-tags">' + tags + '</div>' +
+        '<div class="sc-moat"><span class="sc-moat-lbl">⬡ Moat</span>' + s.moat + '</div>';
+
+      body.appendChild(card);
+    });
+
+    div.appendChild(hdr);
+    div.appendChild(body);
+    container.appendChild(div);
+  });
+}
+
+// ─── EXPAND ALL TOGGLE ───────────────────────────────────────────────────────
+
+var expandedAll = false;
+document.getElementById('expandBtn').addEventListener('click', function() {
+  expandedAll = !expandedAll;
+  var layers = document.querySelectorAll('.layer');
+  layers.forEach(function(l) {
+    if (expandedAll) l.classList.add('open');
+    else l.classList.remove('open');
+  });
+  this.textContent = expandedAll ? 'Collapse All' : 'Expand All';
+});
+
+// ─── REGION FILTER ───────────────────────────────────────────────────────────
+
+document.querySelector('.ctrl-bar').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-region]');
+  var allBtn = document.getElementById('filterAll');
+  if (!btn && e.target !== allBtn) return;
+
+  document.querySelectorAll('.ctrl-btn[data-region], #filterAll').forEach(function(b) {
+    b.classList.remove('active');
+  });
+
+  if (e.target === allBtn || !btn) {
+    allBtn.classList.add('active');
+    document.querySelectorAll('.sc').forEach(function(c) { c.style.display = ''; });
+    return;
+  }
+
+  btn.classList.add('active');
+  var region = btn.getAttribute('data-region');
+  document.querySelectorAll('.sc').forEach(function(c) {
+    var country = c.getAttribute('data-country') || '';
+    c.style.display = country.indexOf(region) >= 0 ? '' : 'none';
+  });
+});
+
+document.getElementById('filterAll').addEventListener('click', function() {
+  document.querySelectorAll('.ctrl-btn[data-region], #filterAll').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  this.classList.add('active');
+  document.querySelectorAll('.sc').forEach(function(c) { c.style.display = ''; });
+});
+
+// ─── TOOLTIP LOGIC ───────────────────────────────────────────────────────────
+
+var tooltip = document.getElementById('tooltip');
+var activePartEl = null;
+var tooltipLocked = false;
+
+function showTooltip(partId, x, y) {
+  var pdata = PART_DATA[partId];
+  if (!pdata) return;
+  var layer = LAYER_MAP[pdata.layerId];
+  if (!layer) return;
+
+  document.getElementById('tt-icon').textContent = pdata.icon;
+  document.getElementById('tt-part-name').textContent = pdata.partName;
+  document.getElementById('tt-layer-badge').textContent = 'Layer ' + layer.num + ' — ' + layer.title;
+  document.getElementById('tt-layer-badge').style.color = layer.color;
+  document.getElementById('tt-layer-badge').style.borderColor = layer.color + '44';
+  document.getElementById('tt-layer-badge').style.background = layer.color + '18';
+  document.getElementById('tt-part-desc').textContent = pdata.partDesc;
+  document.getElementById('tt-layer-desc').textContent = layer.layerDesc;
+
+  // build supplier rows
+  var topBody = document.getElementById('tt-suppliers-top');
+  var extraBody = document.getElementById('tt-suppliers-extra');
+  var moreBtn = document.getElementById('tt-more-btn');
+  topBody.innerHTML = '';
+  extraBody.innerHTML = '';
+  extraBody.classList.remove('show');
+
+  layer.suppliers.forEach(function(s, i) {
+    var isPrivate = s.ticker === 'Private' || s.ticker === 'OSS';
+    var tickerHtml = '<span class="tt-ticker' + (isPrivate ? ' pvt' : '') + '">' + s.ticker + '</span>';
+    var row = '<tr><td>' + s.name + '</td><td>' + tickerHtml + '</td><td style="color:var(--muted2);font-size:11px">' + s.products[0] + '</td></tr>';
+    if (i < 3) topBody.innerHTML += row;
+    else extraBody.innerHTML += row;
+  });
+
+  if (layer.suppliers.length > 3) {
+    moreBtn.style.display = 'block';
+    moreBtn.textContent = '+ Show ' + (layer.suppliers.length - 3) + ' More';
+  } else {
+    moreBtn.style.display = 'none';
+  }
+
+  positionTooltip(x, y);
+  tooltip.classList.add('visible');
+}
+
+function positionTooltip(x, y) {
+  var tw = 390, th = 460;
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var left = x + 16;
+  var top = y - 20;
+  if (left + tw > vw - 12) left = x - tw - 16;
+  if (left < 8) left = 8;
+  if (top + th > vh - 12) top = vh - th - 12;
+  if (top < 8) top = 8;
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+}
+
+document.getElementById('tt-more-btn').addEventListener('click', function() {
+  var extra = document.getElementById('tt-suppliers-extra');
+  extra.classList.toggle('show');
+  this.textContent = extra.classList.contains('show') ? '− Show Less' : '+ Show More';
+});
+
+// Attach events to SVG parts
+document.querySelectorAll('.robot-part').forEach(function(part) {
+  part.addEventListener('mouseenter', function(e) {
+    if (tooltipLocked) return;
+    if (activePartEl) activePartEl.classList.remove('active');
+    activePartEl = this;
+    this.classList.add('active');
+    var rect = this.getBoundingClientRect();
+    showTooltip(this.getAttribute('data-part'), rect.right, rect.top + rect.height / 2);
+  });
+
+  part.addEventListener('mouseleave', function() {
+    if (tooltipLocked) return;
+    tooltip.classList.remove('visible');
+    this.classList.remove('active');
+    activePartEl = null;
+  });
+
+  part.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var partId = this.getAttribute('data-part');
+    if (tooltipLocked && activePartEl === this) {
+      // unlock
+      tooltipLocked = false;
+      tooltip.classList.remove('visible');
+      this.classList.remove('active');
+      activePartEl = null;
+      return;
+    }
+    if (activePartEl) activePartEl.classList.remove('active');
+    activePartEl = this;
+    this.classList.add('active');
+    tooltipLocked = true;
+    var rect = this.getBoundingClientRect();
+    showTooltip(partId, rect.right, rect.top + rect.height / 2);
+
+    // also open the corresponding layer panel
+    var pdata = PART_DATA[partId];
+    if (pdata) {
+      var layerEl = document.getElementById('layer-' + pdata.layerId);
+      if (layerEl) {
+        layerEl.classList.add('open');
+        setTimeout(function() {
+          layerEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 100);
+      }
+    }
+  });
+});
+
+// Click outside to dismiss locked tooltip
+document.addEventListener('click', function(e) {
+  if (!tooltip.contains(e.target) && !e.target.closest('.robot-part')) {
+    tooltipLocked = false;
+    tooltip.classList.remove('visible');
+    if (activePartEl) { activePartEl.classList.remove('active'); activePartEl = null; }
+  }
+});
+
+// tooltip pointer events
+tooltip.addEventListener('mouseenter', function() {
+  if (!tooltipLocked) tooltip.classList.add('visible');
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+renderLayers();
+
+// open first layer by default
+var firstLayer = document.querySelector('.layer');
+if (firstLayer) firstLayer.classList.add('open');
+</script>
+</body>
+</html>
