@@ -336,6 +336,124 @@ h1 em { color: var(--c1); font-style: normal; }
   font-size: 10px; letter-spacing: 1px;
   border-top: 1px solid var(--border);
 }
+
+/* ── TICKER HOVER ── */
+.sc-ticker:not(.pvt) {
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  position: relative;
+}
+.sc-ticker:not(.pvt):hover {
+  background: rgba(0,229,255,0.18);
+  border-color: var(--c1);
+  color: #fff;
+}
+.sc-ticker:not(.pvt)::after {
+  content: '↗';
+  font-size: 8px;
+  margin-left: 3px;
+  opacity: 0.5;
+}
+
+/* ── STOCK CARD ── */
+#stockCard {
+  position: fixed;
+  z-index: 2000;
+  width: 300px;
+  background: #080f18;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,229,255,0.07);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transition: opacity .18s, transform .18s;
+  overflow: hidden;
+}
+#stockCard.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.sk-top {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between;
+}
+.sk-name-wrap {}
+.sk-company { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
+.sk-ticker-lbl {
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  color: var(--c1); margin-top: 2px;
+}
+.sk-price-wrap { text-align: right; }
+.sk-price {
+  font-family: 'Space Mono', monospace;
+  font-size: 18px; font-weight: 700; color: #fff;
+}
+.sk-change {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px; margin-top: 2px;
+}
+.sk-change.up { color: #4dff91; }
+.sk-change.dn { color: #ff5555; }
+.sk-change.flat { color: var(--muted2); }
+
+.sk-chart-wrap {
+  padding: 0;
+  height: 72px;
+  background: #050c14;
+  position: relative;
+}
+#skCanvas { display: block; width: 100%; height: 72px; }
+
+.sk-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 0;
+}
+.sk-stat {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.sk-stat:nth-child(even) { border-right: none; }
+.sk-stat:nth-last-child(-n+2) { border-bottom: none; }
+.sk-stat-lbl {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; letter-spacing: 1.5px;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 2px;
+}
+.sk-stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px; color: var(--text); font-weight: 700;
+}
+
+.sk-footer {
+  padding: 6px 16px;
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; color: var(--muted);
+  letter-spacing: 1px;
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sk-exchange { color: var(--muted2); }
+
+.sk-loading {
+  padding: 28px 16px;
+  text-align: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 2px;
+}
+.sk-error {
+  padding: 16px;
+  text-align: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px; color: #ff5555;
+  letter-spacing: 1px;
+}
 </style>
 </head>
 <body>
@@ -633,7 +751,14 @@ h1 em { color: var(--c1); font-style: normal; }
   </div>
 </div>
 
-<div class="footer">Data as of Q1 2026 · Public tickers on major exchanges · Not investment advice</div>
+<div class="footer">Data as of Q1 2026 · Public tickers on major exchanges · Not investment advice · Stock data via <a href="https://finnhub.io" target="_blank" style="color:var(--c1);text-decoration:none">Finnhub</a> free API (EOD)</div>
+
+<!-- STOCK CARD -->
+<div id="stockCard">
+  <div id="skInner">
+    <div class="sk-loading" id="skLoading">// searching market data...</div>
+  </div>
+</div>
 
 <script>
 // ─── DATA ───────────────────────────────────────────────────────────────────
@@ -1165,12 +1290,243 @@ tooltip.addEventListener('mouseenter', function() {
   if (!tooltipLocked) tooltip.classList.add('visible');
 });
 
+// ─── STOCK CARD ───────────────────────────────────────────────────────────────
+// Uses Finnhub free API — sign up free (no credit card) at https://finnhub.io
+// Free tier: 60 calls/min, proper CORS headers, works directly from browser
+// ↓ Paste your free key below (one-time setup)
+var WORKER_URL = 'https://tight-feather-98e4.duke-haderach.workers.dev';
+
+var stockCard = document.getElementById('stockCard');
+var skInner   = document.getElementById('skInner');
+var stockCache = {};
+var stockCardTimer = null;
+var currentTicker = null;
+
+function fmtNum(n, d) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toFixed(d === undefined ? 2 : d);
+}
+function fmtBig(n) {
+  if (n == null || isNaN(n)) return '—';
+  if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (n >= 1e9)  return '$' + (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6)  return '$' + (n/1e6).toFixed(1) + 'M';
+  return '$' + n.toFixed(0);
+}
+
+function drawSparkline(canvas, prices, isUp) {
+  var dpr = window.devicePixelRatio || 1;
+  var W = canvas.offsetWidth || 300, H = canvas.offsetHeight || 72;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  var valid = prices.filter(function(p){ return p != null && !isNaN(p); });
+  if (valid.length < 2) {
+    ctx.fillStyle = '#050c14'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#4e6478'; ctx.font = '10px monospace';
+    ctx.textAlign = 'center'; ctx.fillText('no chart data', W/2, H/2+4);
+    return;
+  }
+  var mn = Math.min.apply(null,valid), mx = Math.max.apply(null,valid), rng = mx-mn||1, pad = 8;
+  var color = isUp ? '#4dff91' : '#ff5555';
+  var grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, isUp ? 'rgba(77,255,145,0.22)' : 'rgba(255,85,85,0.22)');
+  grad.addColorStop(1, 'rgba(5,12,20,0)');
+  function px(i){ return pad + (i/(prices.length-1))*(W-pad*2); }
+  function py(v){ return H - pad - ((v-mn)/rng)*(H-pad*2); }
+  ctx.beginPath();
+  var s=false;
+  prices.forEach(function(p,i){ if(p==null||isNaN(p))return; if(!s){ctx.moveTo(px(i),py(p));s=true;}else ctx.lineTo(px(i),py(p)); });
+  ctx.lineTo(px(prices.length-1),H); ctx.lineTo(px(0),H); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.beginPath(); s=false;
+  prices.forEach(function(p,i){ if(p==null||isNaN(p))return; if(!s){ctx.moveTo(px(i),py(p));s=true;}else ctx.lineTo(px(i),py(p)); });
+  ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.lineJoin='round'; ctx.stroke();
+  var li=-1;
+  for(var i=prices.length-1;i>=0;i--){if(prices[i]!=null&&!isNaN(prices[i])){li=i;break;}}
+  if(li>=0){ctx.beginPath();ctx.arc(px(li),py(prices[li]),3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();}
+}
+
+function renderStockCard(ticker, data) {
+  var q = data.quote||{}, p = data.profile||{}, m = data.metric||{};
+  var candles = data.candles||[];
+  var curr = q.c, prev = q.pc, chg = q.d!=null?q.d:(curr-prev), pct = q.dp!=null?q.dp:((chg/prev)*100);
+  var isUp = chg>=0, sgn = isUp?'+':'';
+  var currency = p.currency||'USD';
+  var changeStr = sgn+fmtNum(chg)+' ('+sgn+fmtNum(pct)+'%)';
+  var hi52 = m['52WeekHigh'], lo52 = m['52WeekLow'];
+  var mktCap = p.marketCapitalization ? p.marketCapitalization*1e6 : null;
+  var stats = [
+    {lbl:'52W High', val: hi52  ? fmtNum(hi52)       : '—'},
+    {lbl:'52W Low',  val: lo52  ? fmtNum(lo52)        : '—'},
+    {lbl:'Mkt Cap',  val: fmtBig(mktCap)},
+    {lbl:'Volume',   val: q.v   ? (q.v/1e6).toFixed(1)+'M' : '—'},
+    {lbl:'P/E TTM',  val: m.peBasicExclExtraTTM       ? fmtNum(m.peBasicExclExtraTTM) : '—'},
+    {lbl:'EPS',      val: m.epsBasicExclExtraAnnual   ? fmtNum(m.epsBasicExclExtraAnnual) : '—'},
+  ];
+  var html = '<div class="sk-top">';
+  html += '<div class="sk-name-wrap"><div class="sk-company">'+(p.name||ticker)+'</div>';
+  html += '<div class="sk-ticker-lbl">'+ticker+(p.exchange?' · '+p.exchange:'')+'</div></div>';
+  html += '<div class="sk-price-wrap"><div class="sk-price">'+currency+' '+fmtNum(curr)+'</div>';
+  html += '<div class="sk-change '+(isUp?'up':'dn')+'">'+changeStr+'</div></div></div>';
+  html += '<div class="sk-chart-wrap"><canvas id="skCanvas"></canvas></div>';
+  html += '<div class="sk-stats">';
+  stats.forEach(function(s){ html += '<div class="sk-stat"><div class="sk-stat-lbl">'+s.lbl+'</div><div class="sk-stat-val">'+s.val+'</div></div>'; });
+  html += '</div>';
+  html += '<div class="sk-footer"><span>EOD · <a href="https://finnhub.io" target="_blank" style="color:var(--c1);text-decoration:none">Finnhub</a></span>';
+  html += '<span class="sk-exchange">'+(p.country||'')+'</span></div>';
+  skInner.innerHTML = html;
+  requestAnimationFrame(function(){ var c=document.getElementById('skCanvas'); if(c) drawSparkline(c,candles,isUp); });
+}
+
+function showSkLoading() {
+  if (!FINNHUB_KEY) {
+    skInner.innerHTML = '<div class="sk-error" style="padding:14px;line-height:1.7;text-align:left">' +
+      '<b style="color:#fff;font-size:12px">One-time setup needed</b><br>' +
+      '1. Go to <a href="https://finnhub.io/register" target="_blank" style="color:var(--c1)">finnhub.io/register</a> (free)<br>' +
+      '2. Copy your API key<br>' +
+      '3. Open this HTML file and set:<br>' +
+      '<code style="color:var(--c1);font-size:10px;display:block;margin-top:4px;word-break:break-all">var FINNHUB_KEY = 'your_key_here';</code>' +
+      '</div>';
+    return;
+  }
+  skInner.innerHTML = '<div class="sk-loading">// loading market data...</div>';
+}
+function showSkError(msg) {
+  skInner.innerHTML = '<div class="sk-error">'+(msg||'Data unavailable')+'</div>';
+}
+
+function positionStockCard(x, y) {
+  var cw=300, ch=320, vw=window.innerWidth, vh=window.innerHeight;
+  var left=x+12, top=y-110;
+  if(left+cw>vw-10) left=x-cw-12;
+  if(left<8) left=8;
+  if(top+ch>vh-10) top=vh-ch-10;
+  if(top<8) top=8;
+  stockCard.style.left=left+'px'; stockCard.style.top=top+'px';
+}
+
+async function fetchStock(ticker) {
+  if (!FINNHUB_KEY) return { ok: false, noKey: true };
+  try {
+    	
+    var base = WORKER_URL;
+    var sym = encodeURIComponent(ticker);
+    //var t = '&token=' + FINNHUB_KEY;
+    var now = Math.floor(Date.now()/1000);
+    var from = now - 90*24*3600;
+
+    var results = await Promise.all([
+      fetch(base+'/quote?symbol='+sym+t).then(function(r){return r.json();}),
+      fetch(base+'/stock/profile2?symbol='+sym+t).then(function(r){return r.json();}),
+      fetch(base+'/stock/metric?symbol='+sym+'&metric=all'+t).then(function(r){return r.json();}),
+      fetch(base+'/stock/candle?symbol='+sym+'&resolution=W&from='+from+'&to='+now+t).then(function(r){return r.json();})
+    ]);
+
+    var qRes=results[0], pRes=results[1], mRes=results[2], cRes=results[3];
+
+    if (!qRes || qRes.c == null || qRes.c === 0) return { ok: false };
+
+    return {
+      ok: true,
+      quote: qRes,
+      profile: pRes||{},
+      metric: (mRes&&mRes.metric)||{},
+      candles: (cRes&&cRes.s==='ok'&&cRes.c) ? cRes.c : []
+    };
+  } catch(e) {
+    console.error('Finnhub error:', e);
+    return { ok: false };
+  }
+}
+
+function attachTickerHovers() {
+  // Since the Anthropic API fetch takes 2-5s, we use CLICK to trigger the stock card
+  // (hover would dismiss before data arrives). Click again or click outside to close.
+  document.querySelectorAll('.sc-ticker:not(.pvt)').forEach(function(el) {
+    if (el.dataset.stockBound) return; // prevent double-binding from MutationObserver
+    el.dataset.stockBound = '1';
+    el.title = 'Click to load stock data';
+    el.style.cursor = 'pointer';
+
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var ticker = this.textContent.trim();
+      if (!ticker || ticker === 'OSS') return;
+
+      // Toggle off if already showing this ticker
+      if (currentTicker === ticker && stockCard.classList.contains('visible')) {
+        currentTicker = null;
+        stockCard.classList.remove('visible');
+        return;
+      }
+
+      currentTicker = ticker;
+      var rect = this.getBoundingClientRect();
+      positionStockCard(rect.right, rect.top);
+      showSkLoading();
+      stockCard.classList.add('visible');
+      loadStockData(ticker);
+    });
+  });
+}
+
+// Handle clicks on tickers inside the robot tooltip table
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('.tt-ticker:not(.pvt)');
+  if (el) {
+    e.stopPropagation();
+    var ticker = el.textContent.trim();
+    if (!ticker || ticker === 'OSS') return;
+
+    if (currentTicker === ticker && stockCard.classList.contains('visible')) {
+      currentTicker = null;
+      stockCard.classList.remove('visible');
+      return;
+    }
+    currentTicker = ticker;
+    positionStockCard(e.clientX + 14, e.clientY);
+    showSkLoading();
+    stockCard.classList.add('visible');
+    loadStockData(ticker);
+    return;
+  }
+
+  // Click outside closes stock card
+  if (!stockCard.contains(e.target)) {
+    currentTicker = null;
+    stockCard.classList.remove('visible');
+  }
+});
+
+async function loadStockData(ticker) {
+  if (stockCache[ticker]) {
+    if (currentTicker === ticker) renderStockCard(ticker, stockCache[ticker]);
+    return;
+  }
+  var result = await fetchStock(ticker);
+  if (currentTicker !== ticker) return; // user dismissed while loading
+  if (!result || !result.ok) {
+    showSkError('No data found for ' + ticker);
+    return;
+  }
+  stockCache[ticker] = result;
+  renderStockCard(ticker, result);
+}
+
+// Re-attach after layers render (MutationObserver for dynamic content)
+var mo = new MutationObserver(function() { attachTickerHovers(); });
+mo.observe(document.getElementById('layersList'), { childList: true, subtree: true });
+
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 renderLayers();
 
 // open first layer by default
 var firstLayer = document.querySelector('.layer');
 if (firstLayer) firstLayer.classList.add('open');
+
+// Attach after render
+attachTickerHovers();
 </script>
 </body>
 </html>
